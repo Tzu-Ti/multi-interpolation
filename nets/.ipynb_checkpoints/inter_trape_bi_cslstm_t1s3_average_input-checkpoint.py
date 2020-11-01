@@ -77,11 +77,14 @@ def rnn(images, images_bw, mask_true, num_layers, num_hidden, filter_size, strid
 #         reuse = bool(gen_images)
         # Layer 1 Forward 
         with tf.variable_scope('bi_cslstm_l1', reuse=tf.AUTO_REUSE):
-            # accroding mask_true replace with random noise
-            inputs_fw = mask_true[:, t]*images[:, t] + (1-mask_true[:, t])*sample_Z((1-mask_true[:, t]))
+            # accroding mask_true replace with average of t-1 and t+1 images 
+            if t == (seq_length-1):
+                inputs_fw = mask_true[:, t]*images[:, t]
+            else:
+                inputs_fw = mask_true[:, t]*images[:, t] + (1-mask_true[:, t])*average_input(images[:, t-1], images[:, t+1])
             
-            tf.summary.image('masktrue_fw', reshape_patch_back_gen(mask_true[:,t], 1), 11)
-            tf.summary.image('input_fw', reshape_patch_back_gen(inputs_fw, 1), 11)
+            tf.summary.image('masktrue_fw', reshape_patch_back_gen(mask_true[:,t], 4), 11)
+            tf.summary.image('input_fw', reshape_patch_back_gen(inputs_fw, 4), 11)
             
             hidden_fw[0], cell_fw[0], mem_fw = lstm_fw[0](inputs_fw, hidden_fw[0], cell_fw[0], mem_fw)
             z_t_fw = gradient_highway_fw(hidden_fw[0], z_t_fw)
@@ -91,7 +94,10 @@ def rnn(images, images_bw, mask_true, num_layers, num_hidden, filter_size, strid
         # Layer 1 Backward
         with tf.variable_scope('bi_cslstm_l1', reuse=tf.AUTO_REUSE):
             # accroding mask_true replace with random noise
-            inputs_bw = mask_true[:, seq_length-t-1]*images_bw[:, t] + (1-mask_true[:, seq_length-t-1])*sample_Z((1-mask_true[:, seq_length-t-1]))
+            if t == (seq_length-1):
+                inputs_bw = mask_true[:, seq_length-t-1]*images_bw[:, t]
+            else:
+                inputs_bw = mask_true[:, seq_length-t-1]*images_bw[:, t] + (1-mask_true[:, seq_length-t-1])*average_input(images_bw[:, t-1], images_bw[:, t+1])
             
             hidden_bw[0], cell_bw[0], mem_bw = lstm_bw[0](inputs_bw, hidden_bw[0], cell_bw[0], mem_bw)
             z_t_bw = gradient_highway_bw(hidden_bw[0], z_t_bw)
@@ -291,7 +297,7 @@ def rnn(images, images_bw, mask_true, num_layers, num_hidden, filter_size, strid
                                         name='bi_back_to_pixel')
             gen_images.append(x_gen[t])
             print("generate t: %d" % t)
-            tf.summary.image('x_gen', reshape_patch_back_gen(x_gen[t], 1), seq_length)
+            tf.summary.image('x_gen', reshape_patch_back_gen(x_gen[t], 4), seq_length)
 
     gen_images = tf.stack(gen_images)
     # [batch_size, seq_length, height, width, channels]
@@ -333,6 +339,9 @@ def reshape_patch_back_gen(patch_tensor, patch_size=4):
 
 def sample_Z(m):
     return tf.random_uniform(np.shape(m), minval=0.0, maxval=1.0, dtype=tf.float32)
+
+def average_input(a, b):
+    return (a + b) / 2
 
 def cal_gdl(predImg, target):
         """

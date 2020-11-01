@@ -1,9 +1,17 @@
 import tensorflow as tf
-from nets import trape_bi_jstlstm, bi_cslstm
+from nets import trape_bi_jstlstm, inter_trape_bi_cslstm_t2s2, inter_trape_bi_cslstm_t1s3, inter_trape_bi_cslstm_t3s1, inter_trape_bi_cslstm_t4s0, inter_trape_bi_cslstm_t0s4, inter_trape_bi_cslstm_6666, inter_trape_bi_cslstm_t1s3_average_input, inter_trape_bi_cslstm_t1s3_last_merge, inter_trape_bi_cslstm_t1s3_md_up
 
 
 networks_map = {'trape_bi_jstlstm':trape_bi_jstlstm.rnn,
-                'bi_cslstm':bi_cslstm.rnn,
+                'inter_trape_bi_cslstm': inter_trape_bi_cslstm_t2s2.rnn,
+                'inter_trape_bi_cslstm_t1s3': inter_trape_bi_cslstm_t1s3.rnn,
+                'inter_trape_bi_cslstm_t3s1': inter_trape_bi_cslstm_t3s1.rnn,
+                'inter_trape_bi_cslstm_t4s0': inter_trape_bi_cslstm_t4s0.rnn,
+                'inter_trape_bi_cslstm_t0s4': inter_trape_bi_cslstm_t0s4.rnn,
+                'inter_trape_bi_cslstm_6666': inter_trape_bi_cslstm_6666.rnn,
+                'inter_trape_bi_cslstm_t1s3_average_input': inter_trape_bi_cslstm_t1s3_average_input.rnn,
+                'inter_trape_bi_cslstm_t1s3_last_merge': inter_trape_bi_cslstm_t1s3_last_merge.rnn,
+                'inter_trape_bi_cslstm_t1s3_md_up': inter_trape_bi_cslstm_t1s3_md_up.rnn
                }
 
 

@@ -80,8 +80,8 @@ def rnn(images, images_bw, mask_true, num_layers, num_hidden, filter_size, strid
             # accroding mask_true replace with random noise
             inputs_fw = mask_true[:, t]*images[:, t] + (1-mask_true[:, t])*sample_Z((1-mask_true[:, t]))
             
-            tf.summary.image('masktrue_fw', reshape_patch_back_gen(mask_true[:,t], 1), 11)
-            tf.summary.image('input_fw', reshape_patch_back_gen(inputs_fw, 1), 11)
+            tf.summary.image('masktrue_fw', reshape_patch_back_gen(mask_true[:,t], 4), 11)
+            tf.summary.image('input_fw', reshape_patch_back_gen(inputs_fw, 4), 11)
             
             hidden_fw[0], cell_fw[0], mem_fw = lstm_fw[0](inputs_fw, hidden_fw[0], cell_fw[0], mem_fw)
             z_t_fw = gradient_highway_fw(hidden_fw[0], z_t_fw)
@@ -273,6 +273,18 @@ def rnn(images, images_bw, mask_true, num_layers, num_hidden, filter_size, strid
                                                        strides=1,
                                                        padding='same',
                                                        name='F_h_merge')
+                
+                leftSideConcat = tf.concat([images[:, t*2], hiddenConcatConv[t]], axis=-1)
+                rightSideConcat = tf.concat([leftSideConcat, images_bw[:, (seq_length//2-t-1)*2]], axis=-1)
+                hiddenConcatConv[t] = tf.layers.conv2d(inputs=rightSideConcat,
+                                                       filters=tm_hidden_fw[3][t].get_shape()[-1],
+                                                       kernel_size=1,
+                                                       strides=1,
+                                                       padding='same',
+                                                       name='F_two_merge')
+                
+                print('after convolution: ')
+                print(np.shape(hiddenConcatConv[t]))
             else:
                 hiddenConcat = tf.concat([tm_hidden_bw[3][seq_length//2-t-1], tm_hidden_fw[3][t]], axis=-1)
                 hiddenConcatConv[t] = tf.layers.conv2d(inputs=hiddenConcat,
@@ -281,6 +293,16 @@ def rnn(images, images_bw, mask_true, num_layers, num_hidden, filter_size, strid
                                                        strides=1,
                                                        padding='same',
                                                        name='B_h_merge')
+                
+                rightSideConcat = tf.concat([images_bw[:, (seq_length//2-t-1)*2], hiddenConcatConv[t]], axis=-1)
+                leftSideConcat = tf.concat([rightSideConcat, images[:, t*2]], axis=-1)
+                hiddenConcatConv[t] = tf.layers.conv2d(inputs=leftSideConcat,
+                                                       filters=tm_hidden_bw[3][t].get_shape()[-1],
+                                                       kernel_size=1,
+                                                       strides=1,
+                                                       padding='same',
+                                                       name='B_two_merge')
+                
     for t in range(seq_length//2):
         with tf.variable_scope('generate', reuse=tf.AUTO_REUSE):
             x_gen[t] = tf.layers.conv2d(inputs=hiddenConcatConv[t],
@@ -291,7 +313,7 @@ def rnn(images, images_bw, mask_true, num_layers, num_hidden, filter_size, strid
                                         name='bi_back_to_pixel')
             gen_images.append(x_gen[t])
             print("generate t: %d" % t)
-            tf.summary.image('x_gen', reshape_patch_back_gen(x_gen[t], 1), seq_length)
+            tf.summary.image('x_gen', reshape_patch_back_gen(x_gen[t], 4), seq_length)
 
     gen_images = tf.stack(gen_images)
     # [batch_size, seq_length, height, width, channels]
