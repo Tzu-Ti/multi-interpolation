@@ -2,7 +2,7 @@ __author__ = 'jaden'
 #%%
 import os.path
 import os
-os.environ['CUDA_VISIBLE_DEVICES']= '0, 1'
+os.environ['CUDA_VISIBLE_DEVICES']= '0'
 import time
 import numpy as np
 import tensorflow as tf
@@ -32,7 +32,7 @@ tf.app.flags.DEFINE_string('save_dir', 'checkpoints/kth_bi_lstm',
 tf.app.flags.DEFINE_string('gen_frm_dir', 'results/kth_bi_lstm',
                            'dir to store result.')
 tf.app.flags.DEFINE_string('log_dir', 'log/kth_bi_lstm', 
-                            'log dir for TensorBoard')
+                           'log dir for TensorBoard')
 
 # model
 tf.app.flags.DEFINE_string('model_name', 'trape_bi_jstlstm',
@@ -45,6 +45,8 @@ tf.app.flags.DEFINE_integer('input_length', 5,
                             'encoder hidden states.')
 tf.app.flags.DEFINE_integer('seq_length', 11,
                             'total input and output length.')
+tf.app.flags.DEFINE_integer('gen_num', 5,
+                           'number of generating images')
 tf.app.flags.DEFINE_integer('img_height', 128,
                             'input image width.')
 tf.app.flags.DEFINE_integer('img_width', 128,
@@ -140,7 +142,7 @@ class Model(object):
         variables = tf.global_variables()
         self.saver = tf.train.Saver(variables)
         init = tf.global_variables_initializer()
-        gpu_options = tf.GPUOptions(visible_device_list='0, 1')
+        gpu_options = tf.GPUOptions(visible_device_list='0')
         configProt = tf.ConfigProto(gpu_options=gpu_options)
         #configProt = tf.ConfigProto()
         configProt.gpu_options.allow_growth = True
@@ -228,7 +230,6 @@ def main(argv=None):
         random_flip = np.random.random_sample(
             (FLAGS.batch_size, FLAGS.seq_length))
         true_token = (random_flip < eta)
-        #true_token = (random_flip < pow(base,itr))
         ones = np.ones((FLAGS.img_height/FLAGS.patch_size,
                         FLAGS.img_width/FLAGS.patch_size,
                         FLAGS.patch_size**2*FLAGS.img_channel))
@@ -309,13 +310,7 @@ def main(argv=None):
                                 FLAGS.img_height,
                                 FLAGS.img_width,
                                 FLAGS.img_channel))
-#                     if num_seq < FLAGS.input_length or FLAGS.seq_length-1-num_seq < FLAGS.input_length:
-#                         continue
-#                     else:
-#                         mask_true[num_batch,num_seq] = np.zeros((
-#                                 FLAGS.img_height,
-#                                 FLAGS.img_width,
-#                                 FLAGS.img_channel))
+                        
             mask_true = preprocess.reshape_patch(mask_true, FLAGS.patch_size)
             ###while(test_input_handle.no_batch_left() == False):
             while(batch_id <= 10):
@@ -339,7 +334,19 @@ def main(argv=None):
                 # MSE per frame
                 for i in range(FLAGS.seq_length):
                     x = test_ims[:,i,:,:,0]
-                    gx = img_gen[:,i,:,:,0]
+                    
+                    # Predict only odd images
+                    if FLAGS.gen_num == 5:
+                        if (i % 2 == 1):
+                            gx = img_gen[:,i//2,:,:,0]
+                        else:
+                            gx = test_ims[:,i,:,:,0]
+                    # Predict 11 images
+                    elif FLAGS.gen_num == 11:
+                        if (i % 2 == 1)
+                            gx = img_gen[:,i,:,:,0]
+                        else:
+                            gx = test_ims[:,i,:,:,0]
                     fmae[i] += metrics.batch_mae_frame_float(gx, x)
                     gx = np.maximum(gx, 0)
                     gx = np.minimum(gx, 1)
@@ -369,7 +376,17 @@ def main(argv=None):
                     for i in range(FLAGS.seq_length):
                         name = 'pd' + str(i+1) + '.png'
                         file_name = os.path.join(path, name)
-                        img_pd = img_gen[0,i,:,:,:]
+                        
+                        # Predict only odd images
+                        if FLAGS.gen_num == 5:
+                            if (i % 2 == 1):
+                                img_pd = img_gen[0,i//2,:,:,:]
+                            else:
+                                img_pd = test_ims[0,i,:,:,:]
+                        # Predict 11 images
+                        elif FLAGS.gen_num == 11:
+                            img_pd = img_gen[0,i,:,:,:]
+                        
                         img_pd = np.maximum(img_pd, 0)
                         img_pd = np.minimum(img_pd, 1)
                         img_pd = np.uint8(img_pd * 255)

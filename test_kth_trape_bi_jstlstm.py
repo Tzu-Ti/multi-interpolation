@@ -23,31 +23,31 @@ tf.app.flags.DEFINE_string('train_data_paths',
                            'videolist/KTH/train_data_list.txt',
                            'train data paths.')
 tf.app.flags.DEFINE_string('valid_data_paths',
-                        #    'videolist/KTH/random_files.txt',
-                        #    'videolist/KTH/test_data_list_T=10.txt',
-                           'videolist/KTH/random_092.txt',
+                           'videolist/KTH/test_random_seq=11.txt',
                            'validation data paths.')
 tf.app.flags.DEFINE_string('save_dir', '',
                             'dir to store trained net.')
-tf.app.flags.DEFINE_string('gen_frm_dir', 'results/kth_trape_bi_jstlstm_64b4_200K_infr092',
+tf.app.flags.DEFINE_string('gen_frm_dir', 'results/kth_bi_lstm',
                            'dir to store result.')
-tf.app.flags.DEFINE_string('log_dir', 'log/kth_trape_bi_jstlstm_64b4_200K_infr092', 
+tf.app.flags.DEFINE_string('log_dir', 'log/kth_bi_lstm', 
                             'log dir for TensorBoard')
 
 # model
-tf.app.flags.DEFINE_string('model_name', 'trape_bi_jstlstm',
+tf.app.flags.DEFINE_string('model_name', 'kth_bi_lstm',
                            'The name of the architecture.')
-tf.app.flags.DEFINE_string('pretrained_model', 'checkpoints/kth_trape_bi_jstlstm_64b4_200K/model.ckpt-200000',
+tf.app.flags.DEFINE_string('pretrained_model', 'checkpoints/kth_bi_lstm',
                            'file of a pretrained model to initialize from.')
 tf.app.flags.DEFINE_integer('input_length', 5,
                             'encoder hidden states.')
-tf.app.flags.DEFINE_integer('seq_length', 20,
+tf.app.flags.DEFINE_integer('seq_length', 11,
                             'total input and output length.')
+tf.app.flags.DEFINE_integer('gen_num', 5,
+                           'number of generating images')
 tf.app.flags.DEFINE_integer('img_height', 128,
                             'input image width.')
 tf.app.flags.DEFINE_integer('img_width', 128,
                             'input image height.')
-tf.app.flags.DEFINE_integer('img_channel', 3,
+tf.app.flags.DEFINE_integer('img_channel', 1,
                             'number of image channel.')
 tf.app.flags.DEFINE_integer('stride', 1,
                             'stride of a convlstm layer.')
@@ -121,9 +121,9 @@ class Model(object):
             loss = output_list[1]
             watch_ims = output_list[2]
             watch_ims_rev = output_list[3]
-            pred_ims = gen_ims[:,FLAGS.input_length-4:(FLAGS.seq_length - FLAGS.input_length - 4)]
-            pred_watch_ims = watch_ims[:,FLAGS.input_length-1:]
-            pred_watch_ims_rev = watch_ims_rev[:,FLAGS.input_length-1:]
+            pred_ims = gen_ims[:,:]
+            pred_watch_ims = watch_ims[:,:]
+            pred_watch_ims_rev = watch_ims_rev[:,:]
             self.loss_train = loss / FLAGS.batch_size
             # gradients
             all_params = tf.trainable_variables()
@@ -188,7 +188,7 @@ def main(argv=None):
         avg_mse = 0
         batch_id = 0
         img_mse,ssim,psnr,fmae,sharp= [],[],[],[],[]
-        for i in range(FLAGS.seq_length - FLAGS.input_length -FLAGS.input_length):
+        for i in range(FLAGS.seq_length):
             img_mse.append(0)
             ssim.append(0)
             psnr.append(0)
@@ -201,19 +201,17 @@ def main(argv=None):
                                 FLAGS.img_width,
                                 FLAGS.img_channel))
         for num_batch in range(FLAGS.batch_size):
-            for num_seq in range(FLAGS.seq_length):
-                if num_seq < FLAGS.input_length or FLAGS.seq_length-1-num_seq < FLAGS.input_length:
-                    continue
-                else:
-                    mask_true[num_batch,num_seq] = np.zeros((
-                            FLAGS.img_height,
-                            FLAGS.img_width,
-                            FLAGS.img_channel))
-                # for i in range(17,77):
-                #     for j in range(57,87):
-                #         mask_true[num_batch,num_seq,i,j,0] = 0
-                #         mask_true[num_batch,num_seq,i,j,1] = 0
-                #         mask_true[num_batch,num_seq,i,j,2] = 0
+                for num_seq in range(FLAGS.seq_length):
+                    # 0 2 4 6 8 10 skip
+                    if (num_seq % 2 == 0):
+                        continue
+                    # 1 3 5 7 9 replace random noise
+                    else:
+                        mask_true[num_batch,num_seq] = np.zeros((
+                                FLAGS.img_height,
+                                FLAGS.img_width,
+                                FLAGS.img_channel))
+                        
         mask_true = preprocess.reshape_patch(mask_true, FLAGS.patch_size)
         ###while(test_input_handle.no_batch_left() == False):
         while(batch_id < totalDataLen):
@@ -235,9 +233,22 @@ def main(argv=None):
             ims_rev_watch = np.concatenate(ims_rev_watch)
             ims_rev_watch = preprocess.reshape_patch_back(ims_rev_watch, FLAGS.patch_size)
             # MSE per frame
-            for i in range(FLAGS.seq_length - FLAGS.input_length-FLAGS.input_length):
-                x = test_ims[:,i + FLAGS.input_length,:,:,0]
-                gx = img_gen[:,i,:,:,0]
+            for i in range(FLAGS.seq_length):
+                x = test_ims[:,i,:,:,0]
+                
+                # Predict only odd images
+                if FLAGS.gen_num == 5:
+                    if (i % 2 == 1):
+                        gx = img_gen[:,i//2,:,:,0]
+                    else:
+                        gx = test_ims[:,i,:,:,0]
+                # Predict 11 images
+                elif FLAGS.gen_num == 11:
+                    if (i % 2 == 1):
+                        gx = img_gen[:,i,:,:,0]
+                    else:
+                        gx = test_ims[:,i,:,:,0]
+                
                 fmae[i] += metrics.batch_mae_frame_float(gx, x)
                 gx = np.maximum(gx, 0)
                 gx = np.minimum(gx, 1)
@@ -259,15 +270,25 @@ def main(argv=None):
                 path = os.path.join(res_path, str(fileName))
                 os.mkdir(path)
                 for i in range(FLAGS.seq_length):
-                    name = 'gt_middle_%04d.png' %(i)
+                    name = 'gt' + str(i+1) + '.png'
                     file_name = os.path.join(path, name)
                     img_gt = np.uint8(test_ims[0,i,:,:,:] * 255)
                     cv2.imwrite(file_name, img_gt)
                     
-                for i in range(FLAGS.seq_length-FLAGS.input_length-FLAGS.input_length):
-                    name = 'pred_middle_%04d.png' %(i+FLAGS.input_length)
+                for i in range(FLAGS.seq_length):
+                    name = 'pd' + str(i+1) + '.png'
                     file_name = os.path.join(path, name)
-                    img_pd = img_gen[0,i,:,:,:]
+                    
+#                   # Predict only odd images
+                    if FLAGS.gen_num == 5:
+                        if (i % 2 == 1):
+                            img_pd = img_gen[0,i//2,:,:,:]
+                        else:
+                            img_pd = test_ims[0,i,:,:,:]
+                    # Predict 11 images
+                    elif FLAGS.gen_num == 11:
+                        img_pd = img_gen[0,i,:,:,:]
+                    
                     img_pd = np.maximum(img_pd, 0)
                     img_pd = np.minimum(img_pd, 1)
                     img_pd = np.uint8(img_pd * 255)
@@ -276,23 +297,23 @@ def main(argv=None):
             test_input_handle.next()
         avg_mse = avg_mse / (batch_id*FLAGS.batch_size)
         print('mse per seq: ' + str(avg_mse))
-        for i in range(FLAGS.seq_length - FLAGS.input_length-FLAGS.input_length):
+        for i in range(FLAGS.seq_length):
             print(img_mse[i] / (batch_id*FLAGS.batch_size))
         psnr = np.asarray(psnr, dtype=np.float32)/batch_id
         fmae = np.asarray(fmae, dtype=np.float32)/batch_id
         ssim = np.asarray(ssim, dtype=np.float32)/(FLAGS.batch_size*batch_id)
         sharp = np.asarray(sharp, dtype=np.float32)/(FLAGS.batch_size*batch_id)
         print('psnr per frame: ' + str(np.mean(psnr)))
-        for i in range(FLAGS.seq_length - FLAGS.input_length-FLAGS.input_length):
+        for i in range(FLAGS.seq_length):
             print(psnr[i])
         print('fmae per frame: ' + str(np.mean(fmae)))
-        for i in range(FLAGS.seq_length - FLAGS.input_length-FLAGS.input_length):
+        for i in range(FLAGS.seq_length):
             print(fmae[i])
         print('ssim per frame: ' + str(np.mean(ssim)))
-        for i in range(FLAGS.seq_length - FLAGS.input_length-FLAGS.input_length):
+        for i in range(FLAGS.seq_length):
             print(ssim[i])
         print('sharpness per frame: ' + str(np.mean(sharp)))
-        for i in range(FLAGS.seq_length - FLAGS.input_length-FLAGS.input_length):
+        for i in range(FLAGS.seq_length):
             print(sharp[i])
 
 if __name__ == '__main__':

@@ -98,7 +98,7 @@ def rnn(images, images_bw, mask_true, num_layers, num_hidden, filter_size, strid
         
             tm_hidden_bw[0][t] = z_t_bw
             tm_mem_bw[0][t] = mem_bw
-            
+    
     # Layer 2 only have 5 lstm
     hiddenConcatConv_l2 = [None for i in range(seq_length//2)]
     memConcatConv_l2 = [None for i in range(seq_length//2)]
