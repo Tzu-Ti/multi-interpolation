@@ -343,7 +343,7 @@ def main(argv=None):
                             gx = test_ims[:,i,:,:,0]
                     # Predict 11 images
                     elif FLAGS.gen_num == 11:
-                        if (i % 2 == 1)
+                        if (i % 2 == 1):
                             gx = img_gen[:,i,:,:,0]
                         else:
                             gx = test_ims[:,i,:,:,0]
