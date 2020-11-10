@@ -1,6 +1,7 @@
 __author__ = 'Titi'
 
 import tensorflow as tf
+import numpy as np
 
 class resGroup():
     def __init__(self, n_blocks, input_channel):
@@ -8,13 +9,14 @@ class resGroup():
         self.input_channel = input_channel
         
     def __call__(self, input_feat):
+        blocks = [None for _ in range(self.n_blocks)]
         for n in range(self.n_blocks):
             if n == 0:
-                block = resBlock(self.input_channel, n)
-                self.tm_block = block(input_feat)
+                blocks[n] = resBlock(self.input_channel, n)
+                self.tm_block = blocks[n](input_feat)
             else:
-                block = resBlock(self.input_channel, n)
-                self.tm_block = block(self.tm_block)
+                blocks[n] = resBlock(self.input_channel, n)
+                self.tm_block = blocks[n](self.tm_block)
         
         group_return = tf.math.add(input_feat, self.tm_block)
         

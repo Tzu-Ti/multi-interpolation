@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python train_kth_trape_bi_jstlstm.py --model_name inter_trape_bi_cslstm_t1s3_att --log_dir ../tensorflow/logs/kth_bi_lstm_t1s3_att12 --batch_size 1 --num_hidden 32,32,32,32 --save_dir checkpoints/kth_bi_lstm_t1s3_att12 --gen_frm_dir results/kth_bi_lstm_t1s3_att12 --patch_size 4 --img_channel 3 --train_data_paths videolist/UCF-101/train_data_list.txt --valid_data_paths videolist/UCF-101/val_data_list_sample300.txt
+python train_kth_trape_bi_jstlstm.py --model_name inter_trape_bi_cslstm_t1s3_att --log_dir ../tensorflow/logs/train/ucf_bilstm_t1s3_att12 --batch_size 1 --num_hidden 32,32,32,32 --save_dir checkpoints/ucf_bilstm_t1s3_att12 --gen_frm_dir results/ucf_bilstm_t1s3_att12 --patch_size 4 --img_channel 3 --train_data_paths videolist/UCF-101/train_data_list.txt --valid_data_paths videolist/UCF-101/val_data_list_sample300.txt --test_interval 10000
